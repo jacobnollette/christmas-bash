@@ -1,33 +1,40 @@
 #! /bin/bash
 
-_PWD=$(pwd)
+#  VARIABLES
+_PWD=$(pwd);
+_DATE_CURRENT=$(date '+%Y_%m_%d-%H_%M_%S');
+_FILE="$_PWD/lists/$_DATE_CURRENT";
+_LATEST=`ls "$_PWD/lists" | sort | tail -n 1`
+
 
 echo "Shuffling!";
 
 shuffle () {
 #  Shuffle names list, into candidate bin
-:>$_PWD/output
-cat $_PWD/names | shuf > $_PWD/shuffle
+touch "$_FILE";
+:>"$_FILE"
+cat "$_PWD/names" | shuf > "$_PWD/shuffle"
 }
-
 
 loopOutput () {
 #  Loop through the names/shuffle bin and 
 #  compare if names are in the person's block list
 while read -r a && read -r b <&3;
 do
-	cd $_PWD/blocklist
+	cd "$_PWD/blocklist"
 	
-	if $(grep -q "$b" "$a")
+	if $(grep -q "$b" "$a") || $(grep -q "$a -> $b" "$_PWD/lists/$_LATEST")
 	then
 		_task="shuffle"
 		break
         else
 
 		_task="continue"
-		echo -e "$a -> $b" >> $_PWD/output
+		echo -e "$a -> $b" >> "$_FILE"
 	fi
-done < $_PWD/shuffle 3<$_PWD/names
+done < "$_PWD/shuffle" 3<"$_PWD/names"
+
+
 
 #  here's the end catch
 #  if we've broken the loop, kick off
@@ -39,7 +46,7 @@ case "$_task" in
 	  loopOutput
           ;;
         continue)
-          cat $_PWD/output
+	  finalCheck
           ;;
          
         *)
@@ -49,6 +56,21 @@ case "$_task" in
 esac
 }
 
+finalCheck () {
+while read -r a && read -r b <&3;
+do
+	if $(grep -q "$b -> $a" "$_FILE") && $(grep -q "$a -> $b" "$_FILE")
+	then
+	  shuffle
+	  loopOutput
+	  break
+        else
+          cat "$_FILE"
+	  break
+	fi
+done < "$_PWD/shuffle" 3<"$_PWD/names"
+}
 #  initial kickoff
 shuffle
 loopOutput
+
